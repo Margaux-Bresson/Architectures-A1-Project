@@ -1,0 +1,59 @@
+services:
+  elasticsearch:
+    image: elasticsearch:9.3.2
+    container_name: elasticsearch
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      http.cors.enabled: "true"
+      http.cors.allow-origin: "http://localhost:9200"
+      http.cors.allow-headers: "X-Requested-With,Content-Type,Content-Length,Authorization"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  backend:
+    build: ./fastapi-backend
+    container_name: backend
+    ports:
+      - "8000:8000"
+    environment:
+      ES_URL: http://elasticsearch:9200
+      OLLAMA_URL: http://ollama:11434
+    depends_on:
+      - elasticsearch
+      - ollama
+
+  front:
+    build: ./react-front
+    container_name: react-front
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  elasticsearch-data:
+  ollama-data:
